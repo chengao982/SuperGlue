@@ -128,7 +128,7 @@ parser.add_argument(
     '--batch_size', type=int, default=1,
     help='batch_size')
 parser.add_argument(
-    '--train_path', type=str, default='/home/gao/dataset/70/images'#'/Users/Steve/Desktop/SP/training_set/experiment/dataset/70/images', # MSCOCO2014_yingxin
+    '--train_path', type=str, default='/home/gao/dataset/70/images', #'/Users/Steve/Desktop/SP/training_set/experiment/dataset/70/images', # MSCOCO2014_yingxin
     help='Path to the directory of training imgs.')
 # parser.add_argument(
 #     '--nfeatures', type=int, default=1024,
