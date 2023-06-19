@@ -18,6 +18,8 @@ from torch.utils.data import Dataset
 from models.superpoint import SuperPoint
 from models.utils import frame2tensor, array2tensor
 
+from datasets.prepare_training_data import get_gps_poses, get_correspondence
+
 class SuperPointDataset(Dataset):
 
     def __init__(self, image_path, image_list=None, device='cpu', superpoint_config={}):
@@ -26,6 +28,13 @@ class SuperPointDataset(Dataset):
 
         self.DEBUG = False
         self.image_path = image_path
+        self.target_image_path = image_path.split('/')
+        self.root_path = '/'.join(self.target_image_path[:-2])
+        self.target_image_path[-2] = '65'
+        self.target_image_path = '/'.join(self.target_image_path)
+
+        get_gps_poses(self.root_path)
+
         self.device = device
 
         # Get image names
@@ -34,6 +43,8 @@ class SuperPointDataset(Dataset):
                 self.image_names = f.read().splitlines()
         else:
             self.image_names = [ name for name in os.listdir(image_path)
+                if name.endswith('jpg') or name.endswith('png') ]
+            self.target_image_names = [ name for name in os.listdir(self.target_image_path)
                 if name.endswith('jpg') or name.endswith('png') ]
 
         # Load SuperPoint model
@@ -45,15 +56,25 @@ class SuperPointDataset(Dataset):
 
     def __getitem__(self, idx):
         # Read image
-        image = cv2.imread(os.path.join(self.image_path, self.image_names[idx]), cv2.IMREAD_GRAYSCALE)
+        file_name = self.image_names[idx]
+        image = cv2.imread(os.path.join(self.image_path, file_name), cv2.IMREAD_GRAYSCALE)
         height, width = image.shape[:2]
         min_size = min(height, width)
 
         # Transform image
-        corners = np.array([[0, 0], [0, height], [width, 0], [width, height]], dtype=np.float32)
-        warp = np.random.randint(-min_size / 4, min_size / 4, size=(4, 2)).astype(np.float32)
-        M = cv2.getPerspectiveTransform(corners, corners + warp)
-        image_warped = cv2.warpPerspective(image, M, (width, height))
+        # corners = np.array([[0, 0], [0, height], [width, 0], [width, height]], dtype=np.float32)
+        # warp = np.random.randint(-min_size / 4, min_size / 4, size=(4, 2)).astype(np.float32)
+        # M = cv2.getPerspectiveTransform(corners, corners + warp)
+        # image_warped = cv2.warpPerspective(image, M, (width, height))
+
+        name_image = "".join(list(filter(str.isdigit, file_name)))
+        name_image = int(name_image) - 81
+        target_image_exist = False
+        while target_image_exist is False:
+            target_image_name = str(np.random.randint(name_image-10, name_image+11)).zfill(6)+file_name[-4:]
+            target_image_exist = target_image_name in self.target_image_names
+        image_warped = cv2.imread(os.path.join(self.target_image_path, target_image_name), cv2.IMREAD_GRAYSCALE)
+
         if self.DEBUG: print(f'Image size: {image.shape} -> {image_warped.shape}')
 
         # Extract keypoints
@@ -65,7 +86,8 @@ class SuperPointDataset(Dataset):
         if self.DEBUG: print(f'Original keypoints: {kps0.shape}, descriptors: {desc0.shape}, scores: {scores0.shape}')
 
         # Transform keypoints
-        kps1 = cv2.perspectiveTransform(kps0.cpu().numpy()[None], M)
+        # kps1 = cv2.perspectiveTransform(kps0.cpu().numpy()[None], M)
+        kps1, _ = get_correspondence(self.root_path, file_name, target_image_name, kps0.cpu().numpy(), height, width)
 
         # Filter keypoints
         matches = [ [], [] ]

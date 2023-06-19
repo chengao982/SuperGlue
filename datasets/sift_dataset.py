@@ -12,6 +12,8 @@ import datetime
 from scipy.spatial.distance import cdist
 from torch.utils.data import Dataset
 
+from datasets.prepare_training_data import get_gps_poses, get_correspondence
+
 # from skimage import io, transform
 # from skimage.color import rgb2gray
 #
@@ -27,6 +29,13 @@ class SIFTDataset(Dataset):
         print('Using SIFT dataset')
 
         self.image_path = image_path
+        self.target_image_path = image_path.split('/')
+        self.root_path = '/'.join(self.target_image_path[:-2])
+        self.target_image_path[-2] = '65'
+        self.target_image_path = '/'.join(self.target_image_path)
+
+        get_gps_poses(self.root_path)
+
 
         # Get image names
         if image_list != None:
@@ -34,6 +43,8 @@ class SIFTDataset(Dataset):
                 self.image_names = f.read().splitlines()
         else:
             self.image_names = [ name for name in os.listdir(image_path)
+                if name.endswith('jpg') or name.endswith('png') ]
+            self.target_image_names = [ name for name in os.listdir(self.target_image_path)
                 if name.endswith('jpg') or name.endswith('png') ]
 
         self.nfeatures = nfeatures
@@ -53,19 +64,28 @@ class SIFTDataset(Dataset):
         # data = np.load(self.files[idx], allow_pickle=True)
 
         # Read image
-        image = cv2.imread(os.path.join(self.image_path, self.image_names[idx]), cv2.IMREAD_GRAYSCALE)
+        file_name = self.image_names[idx]
+        image = cv2.imread(os.path.join(self.image_path, file_name), cv2.IMREAD_GRAYSCALE)
 
         # 使用 IO 读取图像 rgb
         # rgb_img = io.imread(file_name)
         # image = rgb2gray(rgb_img)
         sift = self.sift
-        width, height = image.shape[:2]
+        height, width = image.shape[:2]
         # max_size = max(width, height)
         corners = np.array([[0, 0], [0, height], [width, 0], [width, height]], dtype=np.float32)
-        warp = np.random.randint(-224, 224, size=(4, 2)).astype(np.float32)
 
-        M = cv2.getPerspectiveTransform(corners, corners + warp)
-        warped = cv2.warpPerspective(src=image, M=M, dsize=(image.shape[1], image.shape[0]))  # return an image type
+        name_image = "".join(list(filter(str.isdigit, file_name)))
+        name_image = int(name_image) - 81
+        target_image_exist = False
+        while target_image_exist is False:
+            target_image_name = str(np.random.randint(name_image-10, name_image+11)).zfill(6)+file_name[-4:]
+            target_image_exist = target_image_name in self.target_image_names
+        # warp = np.random.randint(-224, 224, size=(4, 2)).astype(np.float32)
+
+        # M = cv2.getPerspectiveTransform(corners, corners + warp)
+        # warped = cv2.warpPerspective(src=image, M=M, dsize=(image.shape[1], image.shape[0]))  # return an image type
+        warped = cv2.imread(os.path.join(self.target_image_path, target_image_name), cv2.IMREAD_GRAYSCALE)
 
         kp1, descs1 = sift.detectAndCompute(image, None)
         kp2, descs2 = sift.detectAndCompute(warped, None)
@@ -104,8 +124,9 @@ class SIFTDataset(Dataset):
 
         matched = self.matcher.match(descs1, descs2)
 
-        kp1_projected = cv2.perspectiveTransform(kp1_np.reshape((1, -1, 2)), M)[0, :, :]  # why [0, :, :]
+        # kp1_projected = cv2.perspectiveTransform(kp1_np.reshape((1, -1, 2)), M)[0, :, :]  # why [0, :, :]
         # kp1_projected = cv2.perspectiveTransform(kp1_np.reshape((-1, 2)), M) # why [0, :, :]
+        kp1_projected, _ = get_correspondence(self.root_path, file_name, target_image_name, kp1_np, height, width)
 
         dists = cdist(kp1_projected, kp2_np)
 
