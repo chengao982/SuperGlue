@@ -69,26 +69,28 @@ class SuperPointDataset(Dataset):
 
         name_image = "".join(list(filter(str.isdigit, file_name)))
         name_image = int(name_image) - 81
-        target_image_exist = False
-        while target_image_exist is False:
+        while True:
             target_image_name = str(np.random.randint(name_image-10, name_image+11)).zfill(6)+file_name[-4:]
-            target_image_exist = target_image_name in self.target_image_names
-        image_warped = cv2.imread(os.path.join(self.target_image_path, target_image_name), cv2.IMREAD_GRAYSCALE)
+            if target_image_name not in self.target_image_names:
+                continue
+            image_warped = cv2.imread(os.path.join(self.target_image_path, target_image_name), cv2.IMREAD_GRAYSCALE)
 
-        if self.DEBUG: print(f'Image size: {image.shape} -> {image_warped.shape}')
+            if self.DEBUG: print(f'Image size: {image.shape} -> {image_warped.shape}')
 
-        # Extract keypoints
-        data = frame2tensor(image, self.device)
-        pred0 = self.superpoint({ 'image': data })
-        kps0 = pred0['keypoints'][0]
-        desc0 = pred0['descriptors'][0]
-        scores0 = pred0['scores'][0]
-        if self.DEBUG: print(f'Original keypoints: {kps0.shape}, descriptors: {desc0.shape}, scores: {scores0.shape}')
+            # Extract keypoints
+            data = frame2tensor(image, self.device)
+            pred0 = self.superpoint({ 'image': data })
+            kps0 = pred0['keypoints'][0]
+            desc0 = pred0['descriptors'][0]
+            scores0 = pred0['scores'][0]
+            if self.DEBUG: print(f'Original keypoints: {kps0.shape}, descriptors: {desc0.shape}, scores: {scores0.shape}')
 
-        # Transform keypoints
-        # kps1 = cv2.perspectiveTransform(kps0.cpu().numpy()[None], M)
-        kps1, _ = get_correspondence(self.root_path, file_name, target_image_name, kps0.cpu().numpy(), height, width)
-
+            # Transform keypoints
+            # kps1 = cv2.perspectiveTransform(kps0.cpu().numpy()[None], M)
+            kps1, _ = get_correspondence(self.root_path, file_name, target_image_name, kps0.cpu().numpy(), height, width)
+            if len(kps1) != 0:
+                break
+        
         # Filter keypoints
         matches = [ [], [] ]
         kps1_filtered = []

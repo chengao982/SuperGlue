@@ -202,7 +202,7 @@ if __name__ == '__main__':
 
     mean_loss = []
     epoch_loss_best = float('inf')
-    for epoch in range(1, opt.epoch+1):
+    for epoch in tqdm(range(1, opt.epoch+1)):
         epoch_loss = 0
         superglue.train()
         # train_loader = tqdm(train_loader)

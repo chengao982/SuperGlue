@@ -77,56 +77,59 @@ class SIFTDataset(Dataset):
 
         name_image = "".join(list(filter(str.isdigit, file_name)))
         name_image = int(name_image) - 81
-        target_image_exist = False
-        while target_image_exist is False:
+        while True:
             target_image_name = str(np.random.randint(name_image-10, name_image+11)).zfill(6)+file_name[-4:]
-            target_image_exist = target_image_name in self.target_image_names
-        # warp = np.random.randint(-224, 224, size=(4, 2)).astype(np.float32)
+            if target_image_name not in self.target_image_names:
+                continue
+            # warp = np.random.randint(-224, 224, size=(4, 2)).astype(np.float32)
 
-        # M = cv2.getPerspectiveTransform(corners, corners + warp)
-        # warped = cv2.warpPerspective(src=image, M=M, dsize=(image.shape[1], image.shape[0]))  # return an image type
-        warped = cv2.imread(os.path.join(self.target_image_path, target_image_name), cv2.IMREAD_GRAYSCALE)
+            # M = cv2.getPerspectiveTransform(corners, corners + warp)
+            # warped = cv2.warpPerspective(src=image, M=M, dsize=(image.shape[1], image.shape[0]))  # return an image type
+            warped = cv2.imread(os.path.join(self.target_image_path, target_image_name), cv2.IMREAD_GRAYSCALE)
 
-        kp1, descs1 = sift.detectAndCompute(image, None)
-        kp2, descs2 = sift.detectAndCompute(warped, None)
+            kp1, descs1 = sift.detectAndCompute(image, None)
+            kp2, descs2 = sift.detectAndCompute(warped, None)
 
-        kp1_num = min(self.nfeatures, len(kp1))
-        kp2_num = min(self.nfeatures, len(kp2))
-        kp1 = kp1[:kp1_num]
-        kp2 = kp2[:kp2_num]
+            kp1_num = min(self.nfeatures, len(kp1))
+            kp2_num = min(self.nfeatures, len(kp2))
+            kp1 = kp1[:kp1_num]
+            kp2 = kp2[:kp2_num]
 
-        kp1_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp1]).astype(
-            np.float32)  # maybe coordinates pt has 3 dimentions; kp1_np.shape=(50,)
-        kp2_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp2]).astype(np.float32)
+            kp1_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp1]).astype(
+                np.float32)  # maybe coordinates pt has 3 dimentions; kp1_np.shape=(50,)
+            kp2_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp2]).astype(np.float32)
 
-        if len(kp1) < 1 or len(kp2) < 1:
-            # print("no kp: ",file_name)
-            return {
-                'keypoints0': torch.zeros([0, 0, 2], dtype=torch.float32),
-                'keypoints1': torch.zeros([0, 0, 2], dtype=torch.float32),
-                'descriptors0': torch.zeros([0, 2], dtype=torch.float32),
-                'descriptors1': torch.zeros([0, 2], dtype=torch.float32),
-                'image0': image,
-                'image1': warped,
-                'file_name': file_name
-            }
-            #     descs1 = np.zeros((1, sift.descriptorSize()), np.float32)
-        # if len(kp2) < 1:
-        #     descs2 = np.zeros((1, sift.descriptorSize()), np.float32)
+            if len(kp1) < 1 or len(kp2) < 1:
+                # print("no kp: ",file_name)
+                return {
+                    'keypoints0': torch.zeros([0, 0, 2], dtype=torch.float32),
+                    'keypoints1': torch.zeros([0, 0, 2], dtype=torch.float32),
+                    'descriptors0': torch.zeros([0, 2], dtype=torch.float32),
+                    'descriptors1': torch.zeros([0, 2], dtype=torch.float32),
+                    'image0': image,
+                    'image1': warped,
+                    'file_name': file_name
+                }
+                #     descs1 = np.zeros((1, sift.descriptorSize()), np.float32)
+            # if len(kp2) < 1:
+            #     descs2 = np.zeros((1, sift.descriptorSize()), np.float32)
 
-        scores1_np = np.array([kp.response for kp in kp1], dtype=np.float32)  # confidence of each key point
-        scores2_np = np.array([kp.response for kp in kp2], dtype=np.float32)
+            scores1_np = np.array([kp.response for kp in kp1], dtype=np.float32)  # confidence of each key point
+            scores2_np = np.array([kp.response for kp in kp2], dtype=np.float32)
 
-        kp1_np = kp1_np[:kp1_num, :]
-        kp2_np = kp2_np[:kp2_num, :]
-        descs1 = descs1[:kp1_num, :]
-        descs2 = descs2[:kp2_num, :]
+            kp1_np = kp1_np[:kp1_num, :]
+            kp2_np = kp2_np[:kp2_num, :]
+            descs1 = descs1[:kp1_num, :]
+            descs2 = descs2[:kp2_num, :]
 
-        matched = self.matcher.match(descs1, descs2)
+            matched = self.matcher.match(descs1, descs2)
 
-        # kp1_projected = cv2.perspectiveTransform(kp1_np.reshape((1, -1, 2)), M)[0, :, :]  # why [0, :, :]
-        # kp1_projected = cv2.perspectiveTransform(kp1_np.reshape((-1, 2)), M) # why [0, :, :]
-        kp1_projected, _ = get_correspondence(self.root_path, file_name, target_image_name, kp1_np, height, width)
+            # kp1_projected = cv2.perspectiveTransform(kp1_np.reshape((1, -1, 2)), M)[0, :, :]  # why [0, :, :]
+            # kp1_projected = cv2.perspectiveTransform(kp1_np.reshape((-1, 2)), M) # why [0, :, :]
+            kp1_projected, _ = get_correspondence(self.root_path, file_name, target_image_name, kp1_np, height, width)
+
+            if len(kp1_projected) != 0:
+                break
 
         dists = cdist(kp1_projected, kp2_np)
 
