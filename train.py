@@ -206,7 +206,7 @@ if __name__ == '__main__':
         epoch_loss = 0
         superglue.train()
         # train_loader = tqdm(train_loader)
-        for i, pred in enumerate(train_loader):
+        for i, pred in tqdm(enumerate(train_loader)):
             for k in pred:
                 if k != 'file_name' and k!='image0' and k!='image1':
                     if type(pred[k]) == torch.Tensor:
