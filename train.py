@@ -120,6 +120,9 @@ parser.add_argument(
     help='Path to the directory in which the .npz results and optional,'
             'visualizations are written')
 parser.add_argument(
+    '--model_output_dir', type=str, default='exp/',
+    help='Path to the directory in which the .pth models are written')
+parser.add_argument(
     '--learning_rate', type=int, default=0.0001,
     help='Learning rate')
 
@@ -155,6 +158,11 @@ if __name__ == '__main__':
     eval_output_dir.mkdir(exist_ok=True, parents=True)
     print('Will write visualization images to',
         'directory \"{}\"'.format(eval_output_dir))
+    
+    model_output_dir = Path(opt.model_output_dir)
+    model_output_dir.mkdir(exist_ok=True, parents=True)
+    print('Will write visualization images to',
+        'directory \"{}\"'.format("exp"))
 
     # detector_factory = {
     #     'superpoint': SuperPointDataset,
@@ -162,7 +170,7 @@ if __name__ == '__main__':
     # }
     detector_dims = {
         'superpoint': 256,
-        'sift': 128,
+        'sift': 256,
     }
 
     config = {
@@ -266,7 +274,7 @@ if __name__ == '__main__':
 
             if (i+1) % 5e3 == 0:
                 model_out_path = "exp/model_epoch_{}.pth".format(epoch)
-                torch.save(superglue, model_out_path)
+                torch.save(superglue.to(torch.float).state_dict(), model_out_path)
                 print ('Epoch [{}/{}], Step [{}/{}], Checkpoint saved to {}' 
                     .format(epoch, opt.epoch, i+1, len(train_loader), model_out_path)) 
 
@@ -274,7 +282,7 @@ if __name__ == '__main__':
         epoch_loss /= len(train_loader)
         if epoch_loss < epoch_loss_best:
             model_out_path = "exp/model_epoch_{}.pth".format(epoch)
-            torch.save(superglue, model_out_path)
+            torch.save(superglue.to(torch.float).state_dict(), model_out_path)
             print("###New Best Model. Epoch [{}/{}] done. Epoch Loss {}. Checkpoint saved to {}"
                 .format(epoch, opt.epoch, epoch_loss, model_out_path))
             epoch_loss_best = epoch_loss
